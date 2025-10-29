@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyCloud</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .header p {
+            opacity: 0.9;
+        }
+        .content {
+            padding: 40px;
+        }
+        .section {
+            margin-bottom: 40px;
+        }
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            background: #f8f9ff;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .upload-area:hover {
+            background: #f0f2ff;
+            border-color: #764ba2;
+        }
+        .upload-area input[type="file"] {
+            display: none;
+        }
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+            transition: transform 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        .file-list {
+            list-style: none;
+        }
+        .file-item {
+            background: #f8f9ff;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .file-item:hover {
+            background: #f0f2ff;
+        }
+        .log-item {
+            background: #fff5f5;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .message {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: none;
+        }
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>☁️ Personal File Manager</h1>
+            <p>Secure Cloud Storage with AWS Services</p>
+        </div>
+        
+        <div class="content">
+            <!-- Upload Section -->
+            <div class="section">
+                <h2>📤 Upload Files</h2>
+                <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                    <p style="font-size: 48px; margin-bottom: 10px;">☁️</p>
+                    <p style="font-size: 18px; color: #667eea;">Click to select file or drag and drop</p>
+                    <input type="file" id="fileInput" onchange="uploadFile()">
+                </div>
+                <div id="uploadMessage" class="message"></div>
+            </div>
+
+            <!-- Files List Section -->
+            <div class="section">
+                <h2>📁 My Files</h2>
+                <button class="btn" onclick="loadFiles()">🔄 Refresh Files</button>
+                <ul id="filesList" class="file-list">
+                    <li style="text-align: center; color: #999;">Click refresh to load your files</li>
+                </ul>
+            </div>
+
+            <!-- Activity Logs Section -->
+            <div class="section">
+                <h2>📊 Activity Logs (DynamoDB)</h2>
+                <button class="btn" onclick="loadLogs()">🔄 Refresh Logs</button>
+                <div id="logsList">
+                    <p style="text-align: center; color: #999;">Click refresh to load activity logs</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showMessage(message, type) {
+            const msgDiv = document.getElementById('uploadMessage');
+            msgDiv.textContent = message;
+            msgDiv.className = 'message ' + type;
+            msgDiv.style.display = 'block';
+            setTimeout(() => {
+                msgDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showMessage('Please select a file', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                showMessage('Uploading...', 'success');
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    showMessage(result.message, 'success');
+                    fileInput.value = '';
+                    loadFiles();
+                    loadLogs();
+                } else {
+                    showMessage('Error: ' + result.message, 'error');
+                }
+            } catch (error) {
+                showMessage('Upload failed: ' + error.message, 'error');
+            }
+        }
+
+        async function loadFiles() {
+            try {
+                const response = await fetch('/files');
+                const result = await response.json();
+                
+                const filesList = document.getElementById('filesList');
+                
+                if (result.status === 'success' && result.files.length > 0) {
+                    filesList.innerHTML = result.files.map(file => `
+                        <li class="file-item">
+                            <div>
+                                <strong>${file.filename}</strong><br>
+                                <small>Uploaded: ${new Date(file.upload_time).toLocaleString()}</small>
+                            </div>
+                            <button class="btn" onclick="downloadFile('${file.file_id}')">⬇️ Download</button>
+                        </li>
+                    `).join('');
+                } else {
+                    filesList.innerHTML = '<li style="text-align: center; color: #999;">No files uploaded yet</li>';
+                }
+            } catch (error) {
+                console.error('Error loading files:', error);
+            }
+        }
+
+        async function downloadFile(fileId) {
+            try {
+                const response = await fetch('/download/' + fileId);
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    window.open(result.download_url, '_blank');
+                    loadLogs();
+                } else {
+                    alert('Download failed: ' + result.message);
+                }
+            } catch (error) {
+                alert('Download failed: ' + error.message);
+            }
+        }
+
+        async function loadLogs() {
+            try {
+                const response = await fetch('/logs');
+                const result = await response.json();
+                
+                const logsList = document.getElementById('logsList');
+                
+                if (result.status === 'success' && result.logs.length > 0) {
+                    logsList.innerHTML = result.logs.map(log => `
+                        <div class="log-item">
+                            <strong>${log.action.toUpperCase()}</strong>: ${log.filename} 
+                            <span style="float: right; color: #999;">
+                                ${new Date(log.timestamp).toLocaleString()}
+                            </span>
+                        </div>
+                    `).join('');
+                } else {
+                    logsList.innerHTML = '<p style="text-align: center; color: #999;">No activity logs yet</p>';
+                }
+            } catch (error) {
+                console.error('Error loading logs:', error);
+            }
+        }
+
+        // Load files and logs on page load
+        window.onload = function() {
+            loadFiles();
+            loadLogs();
+        };
+    </script>
+</body>
+</html>
